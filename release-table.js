@@ -1,5 +1,6 @@
 (()=>{
   let busy=false;
+
   async function releaseCurrentTable(){
     if(busy||!selectedSession)return;
     if(items.length){toast('Order items already added. Table release nahi ho sakta.');return;}
@@ -8,29 +9,58 @@
     try{
       const {error}=await sb.rpc('release_empty_table',{p_session_id:selectedSession});
       if(error)throw error;
-      selectedTable=null;selectedSession=null;items=[];window.menuSearch='';window.orderSheetOpen=false;
+      selectedTable=null;
+      selectedSession=null;
+      items=[];
+      window.menuSearch='';
+      window.orderSheetOpen=false;
       await refreshAll();
-      view='tables';renderNav();render();toast('Table released. Ab Available hai.');
-    }catch(e){toast(e.message||String(e))}finally{busy=false}
+      view='tables';
+      renderNav();
+      render();
+      toast('Table released. Ab Available hai.');
+    }catch(e){
+      toast(e.message||String(e));
+    }finally{
+      busy=false;
+    }
   }
   window.releaseCurrentTable=releaseCurrentTable;
+
   function polishHeader(){
     if(!me)return;
     const who=document.getElementById('who');
     if(!who)return;
-    who.innerHTML=me.role==='owner'?`<span style="display:block;font-size:10px;opacity:.7;line-height:1">OWNER</span><b>${me.name}</b>`:`<span style="display:block;font-size:10px;opacity:.7;line-height:1">WAITER</span><b>${me.name}</b>`;
+    const key=me.role+'|'+me.name;
+    if(who.dataset.polishedUser===key)return;
+    const role=me.role==='owner'?'OWNER':'WAITER';
+    who.innerHTML=`<span style="display:block;font-size:10px;opacity:.7;line-height:1">${role}</span><b>${me.name}</b>`;
     who.style.cssText='text-align:left;line-height:1.15;padding:7px 11px;white-space:nowrap';
+    who.dataset.polishedUser=key;
   }
-  function inject(){
-    polishHeader();
+
+  function injectReleaseButton(){
     if(!me||me.role==='owner'||!selectedSession||items.length)return;
     const h=document.querySelector('.order-page-head');
     if(!h||document.getElementById('releaseTableBtn'))return;
     const b=document.createElement('button');
-    b.id='releaseTableBtn';b.className='btn ghost';b.type='button';b.textContent='Release Table';
+    b.id='releaseTableBtn';
+    b.className='btn ghost';
+    b.type='button';
+    b.textContent='Release Table';
     b.style.cssText='border-color:#b42318;color:#b42318;margin-left:8px;white-space:nowrap';
-    b.onclick=releaseCurrentTable;h.appendChild(b);
+    b.onclick=releaseCurrentTable;
+    h.appendChild(b);
   }
-  new MutationObserver(inject).observe(document.documentElement,{childList:true,subtree:true});
-  document.addEventListener('DOMContentLoaded',inject);setTimeout(inject,300);
+
+  function syncExtras(){
+    polishHeader();
+    injectReleaseButton();
+  }
+
+  // Do not rewrite the header inside a DOM MutationObserver: doing so can create
+  // a self-triggering mutation loop that freezes the page/login UI.
+  document.addEventListener('DOMContentLoaded',syncExtras);
+  document.addEventListener('click',()=>setTimeout(syncExtras,0));
+  setInterval(syncExtras,750);
 })();
