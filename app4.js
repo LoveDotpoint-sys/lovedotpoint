@@ -1,0 +1,78 @@
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+
+async function renderHistory(){
+  const isOwner=me.role==='owner';
+  $('#main').innerHTML=head(isOwner?'Sales / Reports':'My Table History & Reports',isOwner?'All completed table history with payment summary.':'Aapke saare past completed tables aur sales records.')+'<div class="card">Loading history...</div>';
+  let q=sb.from('table_sessions').select('*,restaurant_tables(table_no),staff_profiles:waiter_id(name)').eq('status','finished').order('finished_at',{ascending:false}).limit(1000);
+  if(!isOwner) q=q.eq('waiter_id',me.id);
+  const {data,error}=await q;
+  if(error){toast(error.message);$('#main').innerHTML=head('History / Reports','Unable to load records')+`<div class="card">${esc(error.message)}</div>`;return}
+  const all=(data||[]).filter(s=>s.finished_at);
+  const range=window.historyRange||(isOwner?'today':'all');
+  const now=new Date();
+  let start=null;
+  if(range==='today') start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  if(range==='7d') start=new Date(now.getTime()-7*86400000);
+  if(range==='30d') start=new Date(now.getTime()-30*86400000);
+  const filtered=start?all.filter(s=>new Date(s.finished_at)>=start):all;
+  const total=filtered.reduce((a,b)=>a+Number(b.total_amount||0),0);
+  const avg=filtered.length?total/filtered.length:0;
+  const cash=filtered.filter(s=>(s.payment_mode||'').toLowerCase()==='cash').reduce((a,b)=>a+Number(b.total_amount||0),0);
+  const upi=filtered.filter(s=>(s.payment_mode||'').toLowerCase()==='upi').reduce((a,b)=>a+Number(b.total_amount||0),0);
+  const byTable={}; filtered.forEach(s=>{const n=s.restaurant_tables?.table_no||'-';byTable[n]=(byTable[n]||0)+1});
+  const topTable=Object.entries(byTable).sort((a,b)=>b[1]-a[1])[0];
+  const title=isOwner?'Sales / Reports':'My Table History & Reports';
+  const sub=isOwner?'Restaurant completed bills, waiter and payment summary.':'Past history ab default All par dikhega; sirf aapke served tables.';
+  $('#main').innerHTML=head(title,sub)+`
+    <div class="history-filters">
+      <button class="${range==='today'?'active':''}" onclick="window.historyRange='today';renderHistory()">Today</button>
+      <button class="${range==='7d'?'active':''}" onclick="window.historyRange='7d';renderHistory()">7 Days</button>
+      <button class="${range==='30d'?'active':''}" onclick="window.historyRange='30d';renderHistory()">30 Days</button>
+      <button class="${range==='all'?'active':''}" onclick="window.historyRange='all';renderHistory()">All History</button>
+    </div>
+    <div class="report-grid advanced-reports">
+      ${reportCard('Tables Served',filtered.length,'Completed tables')}
+      ${reportCard('Total Sales',money(total),'Selected period')}
+      ${reportCard('Average Bill',money(avg),'Per table')}
+      ${reportCard('Cash',money(cash),'Collection')}
+      ${reportCard('UPI',money(upi),'Collection')}
+      ${reportCard('Most Served Table',topTable?`Table ${topTable[0]}`:'- ',topTable?`${topTable[1]} times`:'No data')}
+    </div>
+    <div class="history-section-title"><h3>${isOwner?'Completed Bills':'My Past Tables'}</h3><span>${filtered.length} records</span></div>
+    <div class="history-list">${filtered.length?filtered.map(s=>`<div class="history-card"><div class="history-card-top"><div><b>${esc(s.order_no||'Order')}</b><span>Table ${esc(s.restaurant_tables?.table_no||'-')}</span></div><strong>${money(s.total_amount)}</strong></div><div class="history-meta"><span>${new Date(s.finished_at).toLocaleString('en-IN')}</span><span>${esc(s.payment_mode||'-')}</span>${isOwner?`<span>Waiter: ${esc(s.staff_profiles?.name||'-')}</span>`:''}</div></div>`).join(''):'<div class="history-empty">Is period me completed table record nahi hai.</div>'}</div>`;
+}
+
+async function renderStaff(){
+  $('#main').innerHTML=head('Waiter Management','Add, edit, reset, deactivate or remove waiter login while preserving old bills.')+'<div class="card">Loading waiters...</div>';
+  try{
+    const j=await adminCall({action:'list_staff'}); const waiters=(j.data||[]).filter(x=>x.role==='waiter'&&!String(x.login_id||'').startsWith('removed_'));
+    $('#main').innerHTML=head('Waiter Management','Advanced staff control · historical bills remain safe even after Remove')+`
+      <div class="staff-add card"><h3>Add New Waiter</h3><div class="staff-add-grid"><input id="wn" class="field" placeholder="Waiter Name"><input id="wl" class="field" placeholder="Login ID"><input id="wp" class="field" type="password" placeholder="Password (6+)"></div><button class="btn" onclick="addWaiter()">+ Add Waiter</button></div>
+      <div class="staff-list">${waiters.length?waiters.map(w=>`<div class="staff-card"><div class="staff-main"><div><b>${esc(w.name)}</b><span>@${esc(w.login_id)}</span></div><span class="staff-status ${w.active?'on':'off'}">${w.active?'Active':'Inactive'}</span></div><div class="staff-actions"><button class="btn ghost" onclick="editWaiter('${w.id}','${esc(w.name)}','${esc(w.login_id)}')">Edit</button><button class="btn ghost" onclick="resetPw('${w.id}')">Password</button><button class="btn ${w.active?'red':'green'}" onclick="setActive('${w.id}',${!w.active})">${w.active?'Deactivate':'Activate'}</button><button class="btn danger-outline" onclick="deleteWaiter('${w.id}','${esc(w.name)}')">Delete</button></div></div>`).join(''):'<div class="card note">No waiter found.</div>'}</div>`;
+  }catch(e){toast(e.message)}
+}
+
+function editWaiter(id,name,login){
+  $('#modalbox').innerHTML=`<h2>Edit Waiter</h2><div class="note">Name aur Login ID update karein.</div><div class="formrow"><input id="editWaiterName" class="field" value="${esc(name)}" placeholder="Name"></div><div class="formrow"><input id="editWaiterLogin" class="field" value="${esc(login)}" placeholder="Login ID"></div><div class="bill-actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveWaiterEdit('${id}')">Save Changes</button></div>`;$('#modal').classList.remove('hidden');
+}
+async function saveWaiterEdit(id){try{await adminCall({action:'edit_waiter',staff_id:id,name:$('#editWaiterName').value,login_id:$('#editWaiterLogin').value});closeModal();toast('Waiter updated');renderStaff()}catch(e){toast(e.message)}}
+async function deleteWaiter(id,name){if(!confirm(`Delete ${name} login?\n\nOld bills/history safe rahega, lekin waiter login permanently remove ho jayega.`))return;try{await adminCall({action:'delete_waiter',staff_id:id});toast('Waiter removed; history preserved');renderStaff()}catch(e){toast(e.message)}}
+
+let allMenu=[];
+async function loadAllMenu(){const {data,error}=await sb.from('menu_items').select('*').order('category').order('name');if(error)throw error;allMenu=data||[]}
+async function renderMenuManager(){
+  $('#main').innerHTML=head('Menu Management','Add, edit, hide/show and delete menu items.')+'<div class="card">Loading menu...</div>';
+  try{await loadAllMenu()}catch(e){toast(e.message);return}
+  const q=(window.menuAdminSearch||'').toLowerCase().trim(); const cat=window.menuAdminCat||'all';
+  const cats=[...new Set(allMenu.map(x=>x.category))].sort();
+  const list=allMenu.filter(x=>(cat==='all'||x.category===cat)&&(!q||x.name.toLowerCase().includes(q)||x.category.toLowerCase().includes(q)));
+  $('#main').innerHTML=head('Menu Management',`${allMenu.filter(x=>x.active).length} active · ${allMenu.length} total items`)+`
+    <div class="menu-admin-toolbar card"><button class="btn" onclick="openMenuItemModal()">+ Add Menu Item</button><input class="field" placeholder="Search menu..." value="${esc(window.menuAdminSearch||'')}" oninput="window.menuAdminSearch=this.value;renderMenuManager()"><select class="field" onchange="window.menuAdminCat=this.value;renderMenuManager()"><option value="all">All Categories</option>${cats.map(c=>`<option ${cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    <div class="menu-admin-list">${list.length?list.map(x=>`<div class="menu-admin-card ${x.active?'':'inactive'}"><div class="menu-admin-info"><span>${esc(x.category)}</span><b>${esc(x.name)}</b><strong>${money(x.price)}</strong></div><div class="menu-admin-actions"><button class="btn ghost" onclick="openMenuItemModal(${x.id})">Edit</button><button class="btn ${x.active?'red':'green'}" onclick="toggleMenuItem(${x.id},${!x.active})">${x.active?'Hide':'Show'}</button><button class="btn danger-outline" onclick="deleteMenuItem(${x.id},'${esc(x.name)}')">Delete</button></div></div>`).join(''):'<div class="card note">No menu item found.</div>'}</div>`;
+}
+function openMenuItemModal(id=null){const x=id?allMenu.find(m=>m.id===id):null;const cats=[...new Set(allMenu.map(m=>m.category))].sort();$('#modalbox').innerHTML=`<h2>${x?'Edit':'Add'} Menu Item</h2><div class="formrow"><input id="miName" class="field" placeholder="Item Name" value="${esc(x?.name||'')}"></div><div class="formrow"><input id="miCat" class="field" list="catList" placeholder="Category" value="${esc(x?.category||'')}"><datalist id="catList">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div><div class="formrow"><input id="miPrice" class="field" type="number" min="0" step="1" placeholder="Price" value="${x?Number(x.price):''}"></div><div class="bill-actions"><button class="btn ghost" onclick="closeModal()">Cancel</button><button class="btn" onclick="saveMenuItem(${id||'null'})">${x?'Save Changes':'Add Item'}</button></div>`;$('#modal').classList.remove('hidden')}
+async function saveMenuItem(id){const name=$('#miName').value.trim(),category=$('#miCat').value.trim(),price=Number($('#miPrice').value);if(!name||!category||!Number.isFinite(price)||price<0)return toast('Name, category and valid price required');let r;if(id)r=await sb.from('menu_items').update({name,category,price}).eq('id',id);else r=await sb.from('menu_items').insert({name,category,price,active:true});if(r.error)return toast(r.error.message);closeModal();await refreshAll();toast(id?'Menu item updated':'Menu item added');renderMenuManager()}
+async function toggleMenuItem(id,active){const {error}=await sb.from('menu_items').update({active}).eq('id',id);if(error)return toast(error.message);await refreshAll();toast(active?'Item visible':'Item hidden');renderMenuManager()}
+async function deleteMenuItem(id,name){if(!confirm(`Delete ${name} from menu?`))return;const {error}=await sb.from('menu_items').delete().eq('id',id);if(error)return toast(error.message);await refreshAll();toast('Menu item deleted');renderMenuManager()}
+
+function billing(){if(!items.length)return toast('Bill banane ke liye items add karein.');window.orderSheetOpen=false;const total=items.reduce((a,b)=>a+Number(b.unit_price)*b.qty,0);$('#modalbox').innerHTML=`<div class="bill-modal-head"><div><h2>Table ${selectedTable} · Billing</h2><div class="note">Final amount check karke payment complete karein.</div></div></div>${receiptHtml({total,preview:true})}<div class="payment-box"><label>Payment Mode</label><select id="payMode" class="field"><option>Cash</option><option>UPI</option></select></div><div class="bill-actions"><button class="btn ghost" onclick="closeModal()">Back to Order</button><button class="btn green" onclick="finishTable()">Payment Complete & Finish Table</button></div>`;$('#modal').classList.remove('hidden')}
