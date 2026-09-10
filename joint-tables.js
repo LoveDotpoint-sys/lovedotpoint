@@ -14,24 +14,33 @@
     return cleanId(t?.active_session_id);
   }
   function sessionRow(id){const sid=cleanId(id);return sessions.find(s=>String(s.id)===sid)||null}
+  async function fetchSessionPlain(sid){
+    if(!sid)return null;
+    const {data,error}=await sb.from('table_sessions').select('*').eq('id',sid).maybeSingle();
+    if(error){console.error('Joint session fetch failed',error);return null}
+    if(data){sessions=[data,...sessions.filter(x=>String(x.id)!==String(data.id))];return data}
+    return null;
+  }
   async function ensureSessionRow(sessionId,tableNo){
     let sid=resolveSessionId(sessionId,tableNo);
     if(!sid){
       await refreshAll();
       sid=resolveSessionId(sessionId,tableNo);
     }
+    if(!sid&&tableNo!=null){
+      const {data:liveTable,error:tableErr}=await sb.from('restaurant_tables').select('active_session_id,status').eq('table_no',Number(tableNo)).maybeSingle();
+      if(!tableErr)sid=cleanId(liveTable?.active_session_id);
+    }
     if(!sid)return {sid:null,row:null};
-    let s=sessionRow(sid);if(s)return {sid,row:s};
-    const {data,error}=await sb.from('table_sessions').select('*,restaurant_tables(table_no),staff_profiles:waiter_id(name)').eq('id',sid).maybeSingle();
-    if(error){toast(error.message);return {sid,row:null}}
-    if(data){sessions=[data,...sessions.filter(x=>String(x.id)!==String(data.id))];return {sid,row:data}}
-    // Final recovery: re-read the table itself in case the local floor state is stale.
+    let s=sessionRow(sid);if(s&&s.status==='active')return {sid,row:s};
+    s=await fetchSessionPlain(sid);if(s)return {sid,row:s};
+    // Final recovery: use the table's CURRENT active_session_id, not any stale browser value.
     if(tableNo!=null){
-      const {data:liveTable}=await sb.from('restaurant_tables').select('active_session_id,status').eq('table_no',Number(tableNo)).maybeSingle();
-      const liveSid=cleanId(liveTable?.active_session_id);
-      if(liveSid&&liveSid!==sid){
-        const {data:liveSession,error:liveErr}=await sb.from('table_sessions').select('*,restaurant_tables(table_no),staff_profiles:waiter_id(name)').eq('id',liveSid).maybeSingle();
-        if(!liveErr&&liveSession){sessions=[liveSession,...sessions.filter(x=>String(x.id)!==String(liveSession.id))];return {sid:liveSid,row:liveSession}}
+      const {data:liveTable,error:tableErr}=await sb.from('restaurant_tables').select('active_session_id,status').eq('table_no',Number(tableNo)).maybeSingle();
+      const liveSid=tableErr?'':cleanId(liveTable?.active_session_id);
+      if(liveSid){
+        const liveSession=await fetchSessionPlain(liveSid);
+        if(liveSession)return {sid:liveSid,row:liveSession};
       }
     }
     return {sid,row:null};
@@ -74,7 +83,7 @@
   window.manageJointTables=async function(sessionId,tableNo){
     const resolved=await ensureSessionRow(sessionId,tableNo);
     const s=resolved.row, sid=resolved.sid;
-    if(!s||!sid)return toast('Live session load nahi hua. Table ko ek baar Live Tables se reopen karke try karein.');
+    if(!s||!sid)return toast('Live session load nahi hua. Table ko Live Tables se reopen karke try karein.');
     if(s.status!=='active')return toast('Ye table session ab active nahi hai.');
     if(me?.role!=='owner'&&String(s.waiter_id)!==String(me?.id))return toast('Only assigned waiter or owner can manage joined tables');
     if(me?.role==='waiter'){selectedSession=sid;if(tableNo!=null)selectedTable=Number(tableNo)}
