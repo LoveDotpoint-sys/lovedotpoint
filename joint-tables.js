@@ -2,6 +2,13 @@
 (function(){
   const escJoint=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function sessionRow(id){return sessions.find(s=>String(s.id)===String(id))||null}
+  async function ensureSessionRow(id){
+    let s=sessionRow(id);if(s)return s;
+    const {data,error}=await sb.from('table_sessions').select('*,restaurant_tables(table_no),staff_profiles:waiter_id(name)').eq('id',id).maybeSingle();
+    if(error){toast(error.message);return null}
+    if(data){sessions=[data,...sessions.filter(x=>String(x.id)!==String(data.id))];return data}
+    return null;
+  }
   function jointNos(id){
     const active=tables.filter(t=>String(t.active_session_id||'')===String(id)).map(t=>Number(t.table_no)).sort((a,b)=>a-b);
     if(active.length)return active;
@@ -27,7 +34,7 @@
   function injectOrderJointBar(){
     if(me?.role!=='waiter'||!selectedSession)return;
     const headEl=document.querySelector('.order-page-head');if(!headEl)return;
-    const nums=jointNos(selectedSession),label=nums.join(' + ');
+    const nums=jointNos(selectedSession),label=nums.join(' + ')||String(selectedTable||'');
     const title=headEl.querySelector('h2');if(title)title.textContent=(nums.length>1?'Tables ':'Table ')+label;
     document.querySelectorAll('.sheet-head b').forEach(x=>x.textContent=(nums.length>1?'Tables ':'Table ')+label+' · Current Order');
     let bar=document.getElementById('jointOrderBar');if(bar)return;
@@ -37,7 +44,12 @@
   }
 
   window.manageJointTables=async function(sessionId,tableNo){
-    const s=sessionRow(sessionId);if(!s)return toast('Active session not found');
+    let s=await ensureSessionRow(sessionId);
+    if(!s){
+      await refreshAll();s=await ensureSessionRow(sessionId);
+    }
+    if(!s)return toast('Live table session load nahi hua. Floor refresh karke dobara try karein.');
+    if(s.status!=='active')return toast('Ye table session ab active nahi hai.');
     if(me?.role!=='owner'&&String(s.waiter_id)!==String(me?.id))return toast('Only assigned waiter or owner can manage joined tables');
     const current=jointNos(sessionId),available=tables.filter(t=>t.status==='available'&&!t.active_session_id).sort((a,b)=>a.table_no-b.table_no);
     const currentHtml=current.map(no=>`<div class="joint-current-chip"><span>Table ${no}</span>${current.length>1?`<button onclick="unjoinOneTable('${sessionId}',${no})" title="Unjoin Table ${no}">×</button>`:''}</div>`).join('');
@@ -48,7 +60,6 @@
 
   window.joinSelectedTables=async function(sessionId,tableNo){
     const nos=[...document.querySelectorAll('input[name="jointAdd"]:checked')].map(x=>Number(x.value));if(!nos.length)return toast('Select at least one available table');
-    if(!confirm(`Join Table ${nos.join(', ')} with this order?`))return;
     const {data,error}=await sb.rpc('join_tables',{p_session_id:sessionId,p_table_nos:nos});if(error)return toast(error.message);
     await refreshAll();closeModal();
     if(me.role==='waiter'){selectedSession=sessionId;selectedTable=(data||jointNos(sessionId))[0]||tableNo;view='menu';renderNav();render()}else{view='tables';renderNav();render()}
