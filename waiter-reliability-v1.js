@@ -40,8 +40,6 @@
     return refreshPromise;
   };
 
-  // Keep waiter on My Tables after login instead of auto-opening a single active table.
-  // Cashier is routed to its dedicated billing console and must never fall back to waiter UI.
   window.boot=async function(){
     const {data:{user}}=await sb.auth.getUser();
     if(!user)return;
@@ -50,8 +48,9 @@
     me=data;
     document.getElementById('loginView').classList.add('hidden');
     document.getElementById('appView').classList.remove('hidden');
-    const roleLabel=me.role==='owner'?'Owner':me.role==='cashier'?'Billing Cashier':'Waiter';
-    document.getElementById('who').textContent=me.name+' · '+roleLabel;
+    const who=document.getElementById('who');
+    if(me.role==='cashier')who.textContent='CASHIER';
+    else who.textContent=me.name+' · '+(me.role==='owner'?'Owner':'Waiter');
     if(me.role==='cashier'){
       view='cashierqueue';
       selectedTable=null;selectedSession=null;items=[];
