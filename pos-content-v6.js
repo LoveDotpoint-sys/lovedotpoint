@@ -2,7 +2,7 @@
 (function(){
   'use strict';
   function esc2(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  function roleName(){return me?.role==='owner'?'Owner':me?.role==='cashier'?'Billing Cashier':'Waiter'}
+  function roleName(){return me?.role==='owner'?'Owner':me?.role==='cashier'?'Cashier':'Waiter'}
   function pageCopy(){
     const r=me?.role,v=window.view;
     if(r==='owner'&&v==='dashboard')return null;
@@ -24,6 +24,12 @@
     if(!me)return;
     const who=document.getElementById('who');if(!who)return;
     const role=roleName().toUpperCase();
+    if(me.role==='cashier'){
+      if(who.dataset.contentV6==='CASHIER')return;
+      who.innerHTML='<b>CASHIER</b>';
+      who.dataset.contentV6='CASHIER';
+      return;
+    }
     if(who.dataset.contentV6===role+'|'+me.name)return;
     who.innerHTML='<span class="staff-role-label">'+esc2(role)+'</span><b>'+esc2(me.name)+'</b>';
     who.dataset.contentV6=role+'|'+me.name;
