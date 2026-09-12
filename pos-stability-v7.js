@@ -4,7 +4,7 @@
   let authoritative=null,checking=false;
 
   function esc7(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  function roleLabel(role){return role==='owner'?'OWNER':role==='cashier'?'BILLING CASHIER':'WAITER'}
+  function roleLabel(role){return role==='owner'?'OWNER':role==='cashier'?'CASHIER':'WAITER'}
 
   async function resolveRole(){
     if(checking)return authoritative;
@@ -31,9 +31,18 @@
 
   function enforceHeader(){
     const role=activeRole(),name=activeName();
-    if(!role||!name)return;
+    if(!role)return;
     const who=document.getElementById('who');if(!who)return;
     const label=roleLabel(role);
+    if(role==='cashier'){
+      const wanted='<b>CASHIER</b>';
+      if(who.innerHTML!==wanted)who.innerHTML=wanted;
+      who.dataset.authoritativeRole='cashier';
+      delete who.dataset.authoritativeName;
+      who.setAttribute('aria-label','CASHIER');
+      return;
+    }
+    if(!name)return;
     const wanted=`<span class="staff-role-label">${esc7(label)}</span><b>${esc7(name)}</b>`;
     if(who.innerHTML!==wanted)who.innerHTML=wanted;
     who.dataset.authoritativeRole=role;
