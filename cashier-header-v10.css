@@ -1,0 +1,6 @@
+/* Cashier identity is isolated from #who because older waiter modules still write to #who. */
+#cashierIdentityPill{display:none}
+body[data-pos-role="cashier"] #who{display:none!important}
+body[data-pos-role="cashier"] #cashierIdentityPill{display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;white-space:nowrap!important;font-size:10px!important;font-weight:900!important;letter-spacing:.45px!important;padding:7px 10px!important;min-height:29px!important}
+body[data-pos-role="owner"] #cashierIdentityPill,body[data-pos-role="waiter"] #cashierIdentityPill{display:none!important}
+@media(max-width:700px){body[data-pos-role="cashier"] #cashierIdentityPill{font-size:9px!important;padding:7px 8px!important;max-width:78px!important}}
