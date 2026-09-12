@@ -5,11 +5,7 @@
   let resolving=false;
 
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  function labelFor(role,view){
-    if(view==='cashierqueue'||view==='cashierreports'||role==='cashier')return 'CASHIER';
-    if(role==='owner')return 'OWNER';
-    return 'WAITER';
-  }
+  function labelFor(role){if(role==='cashier')return 'CASHIER';if(role==='owner')return 'OWNER';return 'WAITER'}
 
   async function resolveIdentity(){
     if(resolving)return cachedIdentity;
@@ -30,19 +26,19 @@
     return cachedIdentity;
   }
 
-  function identity(){
-    const role=cachedIdentity?.role||window.me?.role||null;
-    const name=cachedIdentity?.name||window.me?.name||'';
-    return {role,name};
+  function identity(){return {role:cachedIdentity?.role||window.me?.role||null,name:cachedIdentity?.name||window.me?.name||''}}
+
+  function applyRoleClass(role){
+    document.body.classList.remove('pos-role-owner','pos-role-waiter','pos-role-cashier');
+    if(role)document.body.classList.add('pos-role-'+role);
   }
 
   function renderHeader(){
-    const who=document.getElementById('who');
-    if(!who)return;
-    const {role,name}=identity();
-    if(!role)return;
-    const label=labelFor(role,window.view);
-    if(role==='cashier'||window.view==='cashierqueue'||window.view==='cashierreports'){
+    const who=document.getElementById('who');if(!who)return;
+    const {role,name}=identity();if(!role)return;
+    applyRoleClass(role);
+    const label=labelFor(role);
+    if(role==='cashier'){
       const html='<b class="top-role-name">CASHIER</b>';
       if(who.innerHTML!==html)who.innerHTML=html;
       who.dataset.roleLock='CASHIER';
@@ -57,8 +53,7 @@
   }
 
   function guardView(){
-    const {role}=identity();
-    if(!role)return;
+    const {role}=identity();if(!role)return;
     if(role==='cashier'&&!['cashierqueue','cashierreports'].includes(window.view)){
       window.view='cashierqueue';
       if(typeof window.renderNav==='function')window.renderNav();
@@ -66,23 +61,12 @@
     }
   }
 
-  async function sync(){
-    if(window.me&&!cachedIdentity)await resolveIdentity();
-    guardView();
-    renderHeader();
-  }
-
+  async function sync(){if(window.me&&!cachedIdentity)await resolveIdentity();guardView();renderHeader()}
   const whoObserver=new MutationObserver(()=>renderHeader());
-  function attachObserver(){
-    const who=document.getElementById('who');
-    if(who){whoObserver.disconnect();whoObserver.observe(who,{childList:true,subtree:true,characterData:true});}
-  }
+  function attachObserver(){const who=document.getElementById('who');if(who){whoObserver.disconnect();whoObserver.observe(who,{childList:true,subtree:true,characterData:true})}}
 
   document.addEventListener('DOMContentLoaded',()=>{attachObserver();setTimeout(sync,50)});
   document.addEventListener('click',()=>setTimeout(sync,0));
-  setInterval(()=>{attachObserver();sync()},250);
-  sb.auth.onAuthStateChange((event)=>{
-    if(event==='SIGNED_OUT'){cachedIdentity=null;return}
-    cachedIdentity=null;setTimeout(sync,80);
-  });
+  setInterval(()=>{attachObserver();sync()},200);
+  sb.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT'){cachedIdentity=null;applyRoleClass(null);return}cachedIdentity=null;setTimeout(sync,80)});
 })();
