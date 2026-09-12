@@ -1,6 +1,6 @@
-function navs(){return me.role==='owner'?[['dashboard','Dashboard'],['tables','Live Tables'],['menuadmin','Menu'],['staff','Waiters'],['history','Reports']]:[['tables','My Tables'],['menu','Take Order'],['history','History']]}
-function render(){if(!me)return;if(view==='dashboard'&&me.role==='owner')renderDashboard();else if(view==='tables')renderTables();else if(view==='menu'&&me.role==='waiter')renderMenu();else if(view==='menuadmin'&&me.role==='owner')renderMenuManager();else if(view==='staff'&&me.role==='owner')renderStaff();else renderHistory()}
-function go(v){if(me.role==='owner'&&v==='menu')v='tables';if(me.role==='waiter'&&(v==='menuadmin'||v==='staff'||v==='dashboard'))v='tables';view=v;renderNav();render()}
+function navs(){return me.role==='owner'?[['dashboard','Dashboard'],['tables','Live Tables'],['menumanager','Menu'],['staff','Waiters'],['history','Reports']]:[['tables','My Tables'],['menu','Take Order'],['history','History']]}
+function render(){if(!me)return;if(view==='dashboard'&&me.role==='owner')renderDashboard();else if(view==='tables')renderTables();else if(view==='menu'&&me.role==='waiter')renderMenu();else if(view==='menumanager'&&me.role==='owner')renderMenuManager();else if(view==='staff'&&me.role==='owner')renderStaff();else renderHistory()}
+function go(v){if(me.role==='owner'&&v==='menu')v='tables';if(me.role==='waiter'&&(v==='menumanager'||v==='staff'||v==='dashboard'))v='tables';view=v;renderNav();render()}
 
 async function renderHistory(){
  const isOwner=me.role==='owner';$('#main').innerHTML=head(isOwner?'Sales / Reports':'My Table History & Reports',isOwner?'Date-wise sales, waiter ranking, bill reprint and void control.':'Aapke saare past completed tables aur bills.')+'<div class="card">Loading...</div>';
