@@ -5,6 +5,10 @@
 .top #who{display:inline-flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important;min-width:0!important;max-width:190px!important;margin:0!important;padding:6px 10px!important;line-height:1.1!important;white-space:nowrap!important}
 .top #who .top-role-label{display:block!important;font-size:9px!important;line-height:1!important;letter-spacing:.55px!important;font-weight:900!important;white-space:nowrap!important}
 .top #who .top-role-name{display:block!important;font-size:11px!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;max-width:100%!important}
+/* Cashier is a single dedicated position: never show login/name in the top pill, even if an older script writes it. */
+body.pos-role-cashier .top #who{font-size:0!important;max-width:none!important;min-width:74px!important;align-items:center!important}
+body.pos-role-cashier .top #who>*{display:none!important}
+body.pos-role-cashier .top #who::before{content:'CASHIER';display:block!important;font-size:10px!important;line-height:1!important;font-weight:900!important;letter-spacing:.7px!important;white-space:nowrap!important}
 .top #posSyncBadge{display:inline-flex!important;align-items:center!important;justify-content:center!important;white-space:nowrap!important;margin:0!important}
 .dash-hero{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:14px!important}
 .dash-hero>div{min-width:0!important;flex:1 1 auto!important}.dash-hero>.btn{flex:0 0 auto!important;align-self:center!important;white-space:nowrap!important}
@@ -12,6 +16,8 @@
  .top .topin{gap:5px!important}.top .brand{flex:0 1 auto!important;min-width:0!important}.top .brand img{flex:0 0 40px!important}
  .top .userbox{gap:4px!important;flex:0 0 auto!important}.top #posSyncBadge{min-width:48px!important;height:27px!important;padding:0 7px!important;font-size:9px!important}
  .top #who{max-width:108px!important;padding:6px 7px!important}.top #who .top-role-label{font-size:7.5px!important;letter-spacing:.3px!important}.top #who .top-role-name{font-size:10px!important}
+ body.pos-role-cashier .top #who{min-width:64px!important;max-width:72px!important;padding:6px!important}
+ body.pos-role-cashier .top #who::before{font-size:9px!important;letter-spacing:.45px!important}
  .top .userbox>.btn{padding:7px 7px!important;font-size:10px!important}.dash-hero{flex-direction:row!important;align-items:center!important}.dash-hero>.btn{flex:0 0 auto!important}
 }
 @media(max-width:390px){.top #who{max-width:90px!important}.top #posSyncBadge{min-width:42px!important;padding:0 5px!important}.top .userbox>.btn{padding:7px 6px!important}}
