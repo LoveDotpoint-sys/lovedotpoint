@@ -68,19 +68,6 @@
   window.showReleaseTableModal=showReleaseTableModal;
   window.confirmReleaseCurrentTable=confirmReleaseCurrentTable;
 
-  function polishHeader(){
-    if(!me)return;
-    const who=document.getElementById('who');
-    if(!who)return;
-    const key=me.role+'|'+me.name;
-    const role=me.role==='owner'?'OWNER':me.role==='cashier'?'BILLING CASHIER':'WAITER';
-    if(who.dataset.polishedUser===key&&who.dataset.roleLabel===role)return;
-    who.innerHTML=`<span class="staff-role-label">${role}</span><b>${me.name}</b>`;
-    who.style.cssText='text-align:left;line-height:1.15;padding:7px 11px;white-space:nowrap';
-    who.dataset.polishedUser=key;
-    who.dataset.roleLabel=role;
-  }
-
   function injectReleaseButton(){
     if(!me||me.role!=='waiter'||!selectedSession||items.length)return;
     const h=document.querySelector('.order-page-head');
@@ -94,11 +81,7 @@
     h.appendChild(b);
   }
 
-  function syncExtras(){
-    polishHeader();
-    injectReleaseButton();
-  }
-
+  function syncExtras(){injectReleaseButton();}
   document.addEventListener('DOMContentLoaded',syncExtras);
   document.addEventListener('click',()=>setTimeout(syncExtras,0));
   setInterval(syncExtras,750);
