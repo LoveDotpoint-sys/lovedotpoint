@@ -73,15 +73,16 @@
     const who=document.getElementById('who');
     if(!who)return;
     const key=me.role+'|'+me.name;
-    if(who.dataset.polishedUser===key)return;
-    const role=me.role==='owner'?'OWNER':'WAITER';
-    who.innerHTML=`<span style="display:block;font-size:10px;opacity:.7;line-height:1">${role}</span><b>${me.name}</b>`;
+    const role=me.role==='owner'?'OWNER':me.role==='cashier'?'BILLING CASHIER':'WAITER';
+    if(who.dataset.polishedUser===key&&who.dataset.roleLabel===role)return;
+    who.innerHTML=`<span class="staff-role-label">${role}</span><b>${me.name}</b>`;
     who.style.cssText='text-align:left;line-height:1.15;padding:7px 11px;white-space:nowrap';
     who.dataset.polishedUser=key;
+    who.dataset.roleLabel=role;
   }
 
   function injectReleaseButton(){
-    if(!me||me.role==='owner'||!selectedSession||items.length)return;
+    if(!me||me.role!=='waiter'||!selectedSession||items.length)return;
     const h=document.querySelector('.order-page-head');
     if(!h||document.getElementById('releaseTableBtn'))return;
     const b=document.createElement('button');
