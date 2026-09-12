@@ -1,0 +1,17 @@
+/* Love Dot Point POS - stable horizontal top controls */
+.top .topin{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important}
+.top .userbox{margin-left:auto!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-end!important;flex-wrap:nowrap!important;gap:7px!important;min-width:0!important}
+.top .userbox>#posSyncBadge,.top .userbox>#who,.top .userbox>.btn{flex:0 0 auto!important}
+.top #who{display:inline-flex!important;flex-direction:column!important;align-items:flex-start!important;justify-content:center!important;min-width:0!important;max-width:190px!important;margin:0!important;padding:6px 10px!important;line-height:1.1!important;white-space:nowrap!important}
+.top #who .top-role-label{display:block!important;font-size:9px!important;line-height:1!important;letter-spacing:.55px!important;font-weight:900!important;white-space:nowrap!important}
+.top #who .top-role-name{display:block!important;font-size:11px!important;line-height:1.15!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;max-width:100%!important}
+.top #posSyncBadge{display:inline-flex!important;align-items:center!important;justify-content:center!important;white-space:nowrap!important;margin:0!important}
+.dash-hero{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:14px!important}
+.dash-hero>div{min-width:0!important;flex:1 1 auto!important}.dash-hero>.btn{flex:0 0 auto!important;align-self:center!important;white-space:nowrap!important}
+@media(max-width:760px){
+ .top .topin{gap:5px!important}.top .brand{flex:0 1 auto!important;min-width:0!important}.top .brand img{flex:0 0 40px!important}
+ .top .userbox{gap:4px!important;flex:0 0 auto!important}.top #posSyncBadge{min-width:48px!important;height:27px!important;padding:0 7px!important;font-size:9px!important}
+ .top #who{max-width:108px!important;padding:6px 7px!important}.top #who .top-role-label{font-size:7.5px!important;letter-spacing:.3px!important}.top #who .top-role-name{font-size:10px!important}
+ .top .userbox>.btn{padding:7px 7px!important;font-size:10px!important}.dash-hero{flex-direction:row!important;align-items:center!important}.dash-hero>.btn{flex:0 0 auto!important}
+}
+@media(max-width:390px){.top #who{max-width:90px!important}.top #posSyncBadge{min-width:42px!important;padding:0 5px!important}.top .userbox>.btn{padding:7px 6px!important}}
