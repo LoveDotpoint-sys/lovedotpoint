@@ -1,191 +1,36 @@
-/* Love Dot Point POS - Cashier Console
-   Dedicated read-only billing desk with live print queue and waiter reports.
-*/
+/* Love Dot Point POS - Advanced Cashier / Billing Console */
 (function(){
-  'use strict';
-
-  const baseBoot=window.boot;
-  const baseNavs=window.navs;
-  const baseRender=window.render;
-  const baseGo=window.go;
-  let cashierChannel=null;
-  let lastPendingCount=0;
-
-  function roleLabel(role){return role==='owner'?'Owner':role==='cashier'?'Cashier':'Waiter'}
-  function safe(v){return typeof esc==='function'?esc(v):String(v??'').replace(/[&<>"']/g,'')}
-  function tableLabel(b){const arr=Array.isArray(b.joined_table_nos)?b.joined_table_nos.filter(Boolean):[];return arr.length?arr.join(' + '):(b.table_no||'-')}
-  function isToday(v){if(!v)return false;return new Date(v).toDateString()===new Date().toDateString()}
-
-  async function rpc(name,args={}){
-    const {data,error}=await sb.rpc(name,args);
-    if(error)throw error;
-    return data;
-  }
-
-  async function admin(body){
-    const {data,error}=await sb.functions.invoke('pos-admin',{body});
-    if(error)throw error;
-    if(data?.error)throw new Error(data.error);
-    return data||{};
-  }
-
-  window.boot=async function(){
-    const {data:{user}}=await sb.auth.getUser();
-    if(!user)return;
-    const {data,error}=await sb.from('staff_profiles').select('*').eq('auth_user_id',user.id).single();
-    if(error||!data){toast('Staff profile not linked');return}
-    if(data.role!=='cashier')return baseBoot();
-
-    me=data;
-    document.getElementById('loginView').classList.add('hidden');
-    document.getElementById('appView').classList.remove('hidden');
-    document.getElementById('who').textContent=me.name+' · Cashier';
-    view='cashierqueue';
-    selectedTable=null;selectedSession=null;items=[];
-    renderNav();
-    await renderCashierQueue();
-    subscribeCashier();
-  };
-
-  window.navs=function(){
-    if(me?.role==='cashier')return [['cashierqueue','Print Queue'],['cashierreports','Reports']];
-    const list=baseNavs();
-    if(me?.role==='owner'&&!list.some(x=>x[0]==='cashiersetup')){
-      const copy=list.slice();
-      const pos=Math.max(0,copy.findIndex(x=>x[0]==='history'));
-      copy.splice(pos,0,['cashiersetup','Cashier']);
-      return copy;
-    }
-    return list;
-  };
-
-  window.go=function(v){
-    if(me?.role==='cashier'){
-      if(!['cashierqueue','cashierreports'].includes(v))v='cashierqueue';
-      view=v;renderNav();return v==='cashierreports'?renderCashierReports():renderCashierQueue();
-    }
-    if(me?.role==='owner'&&v==='cashiersetup'){view=v;renderNav();return renderCashierSetup()}
-    return baseGo(v);
-  };
-
-  window.render=function(){
-    if(me?.role==='cashier')return view==='cashierreports'?renderCashierReports():renderCashierQueue();
-    if(me?.role==='owner'&&view==='cashiersetup')return renderCashierSetup();
-    return baseRender();
-  };
-
-  async function loadQueue(){return await rpc('cashier_bill_queue',{p_limit:500})||[]}
-
-  function queueStats(list){
-    const today=list.filter(x=>isToday(x.finished_at)&&!x.voided);
-    return {
-      pending:list.filter(x=>x.print_status==='pending'&&!x.voided).length,
-      bills:today.length,
-      sales:today.reduce((a,b)=>a+Number(b.total_amount||0),0),
-      cash:today.filter(x=>(x.payment_mode||'').toLowerCase()==='cash').reduce((a,b)=>a+Number(b.total_amount||0),0),
-      upi:today.filter(x=>(x.payment_mode||'').toLowerCase()==='upi').reduce((a,b)=>a+Number(b.total_amount||0),0)
-    }
-  }
-
-  function queueCard(b){
-    const pending=b.print_status==='pending'&&!b.voided;
-    const status=b.voided?'VOID':pending?'PRINT PENDING':'PRINTED';
-    return `<div class="cashier-bill ${pending?'pending':''} ${b.voided?'voided':''}">
-      <div class="cashier-bill-main"><div><span class="cashier-status">${status}</span><b>${safe(b.order_no||'Bill')}</b><small>Table ${safe(tableLabel(b))} · ${safe(b.waiter_name||'Waiter')}</small></div><strong>${money(b.total_amount)}</strong></div>
-      <div class="cashier-meta"><span>${b.finished_at?new Date(b.finished_at).toLocaleString('en-IN'):'-'}</span><span>${safe(b.payment_mode||'-')}</span>${b.print_count?`<span>Printed ${b.print_count}x</span>`:''}</div>
-      <div class="cashier-actions"><button class="btn ${pending?'green':'ghost'}" onclick="cashierOpenBill('${b.id}')">${pending?'Open & Print':'View / Reprint'}</button>${!b.voided&&!pending?`<button class="btn ghost" onclick="cashierMarkPending('${b.id}')">Send to Queue</button>`:''}</div>
-    </div>`;
-  }
-
-  window.renderCashierQueue=async function(){
-    if(me?.role!=='cashier')return;
-    const main=document.getElementById('main');
-    main.innerHTML=head('Billing & Print Queue','Waiter completes a bill → it appears here automatically for printing.')+'<div class="card">Loading bills...</div>';
-    try{
-      const list=await loadQueue();window.cashierQueue=list;
-      const st=queueStats(list);const pending=list.filter(x=>x.print_status==='pending'&&!x.voided);
-      if(st.pending>lastPendingCount&&lastPendingCount>=0){try{navigator.vibrate?.([150,80,150])}catch{};toast('New bill ready to print')}
-      lastPendingCount=st.pending;
-      const q=(window.cashierSearch||'').trim().toLowerCase();
-      const shown=list.filter(x=>!q||(x.order_no||'').toLowerCase().includes(q)||String(tableLabel(x)).includes(q)||(x.waiter_name||'').toLowerCase().includes(q));
-      main.innerHTML=head('Billing & Print Queue','Dedicated cashier phone · all completed waiter bills in one place.')+
-        `<section class="cashier-hero"><div><small>LOVE DOT POINT · CASHIER</small><h2>${safe(me.name)}</h2><p>Printer phone ko Epson TM-T82X ke paas rakhein.</p></div><button class="btn ghost" onclick="renderCashierQueue()">↻ Refresh</button></section>`+
-        `<div class="cashier-kpis"><div><span>Print Pending</span><b>${st.pending}</b></div><div><span>Today Bills</span><b>${st.bills}</b></div><div><span>Today Sales</span><b>${money(st.sales)}</b></div><div><span>Cash / UPI</span><b>${money(st.cash)} / ${money(st.upi)}</b></div></div>`+
-        `${pending.length?`<div class="cashier-alert">🧾 ${pending.length} bill${pending.length===1?'':'s'} waiting for print</div>`:''}`+
-        `<div class="cashier-toolbar card"><input class="field" placeholder="Search bill no / table / waiter" value="${safe(window.cashierSearch||'')}" oninput="window.cashierSearch=this.value;renderCashierQueue()"></div>`+
-        `<div class="cashier-section"><div class="history-section-title"><h3>Completed Bills</h3><span>${shown.length} records</span></div><div class="cashier-list">${shown.length?shown.map(queueCard).join(''):'<div class="card note">No bills found.</div>'}</div></div>`;
-    }catch(e){main.innerHTML=head('Billing & Print Queue','Unable to load')+`<div class="card">${safe(e.message)}</div>`}
-  };
-
-  window.renderCashierReports=async function(){
-    if(me?.role!=='cashier')return;
-    const main=document.getElementById('main');main.innerHTML=head('Waiter Reports','Today waiter-wise sales and completed bills.')+'<div class="card">Loading...</div>';
-    try{
-      const list=await loadQueue();const today=list.filter(x=>isToday(x.finished_at)&&!x.voided);const perf={};
-      today.forEach(x=>{const n=x.waiter_name||'Unknown';if(!perf[n])perf[n]={bills:0,sales:0,cash:0,upi:0};perf[n].bills++;perf[n].sales+=Number(x.total_amount||0);if((x.payment_mode||'').toLowerCase()==='cash')perf[n].cash+=Number(x.total_amount||0);if((x.payment_mode||'').toLowerCase()==='upi')perf[n].upi+=Number(x.total_amount||0)});
-      const ranking=Object.entries(perf).sort((a,b)=>b[1].sales-a[1].sales);const st=queueStats(list);
-      main.innerHTML=head('Waiter Reports','Read-only cashier report · order/menu controls disabled.')+
-        `<div class="cashier-kpis"><div><span>Today Sales</span><b>${money(st.sales)}</b></div><div><span>Completed Bills</span><b>${st.bills}</b></div><div><span>Cash</span><b>${money(st.cash)}</b></div><div><span>UPI</span><b>${money(st.upi)}</b></div></div>`+
-        `<section class="card"><div class="history-section-title"><h3>Waiter Performance Today</h3><span>${ranking.length} waiters</span></div>${ranking.length?ranking.map((r,i)=>`<div class="cashier-rank"><span>#${i+1}</span><div><b>${safe(r[0])}</b><small>${r[1].bills} completed bills · Cash ${money(r[1].cash)} · UPI ${money(r[1].upi)}</small></div><strong>${money(r[1].sales)}</strong></div>`).join(''):'<div class="note">No completed bills today.</div>'}</section>`;
-    }catch(e){main.innerHTML=head('Waiter Reports','Unable to load')+`<div class="card">${safe(e.message)}</div>`}
-  };
-
-  window.cashierOpenBill=async function(id){
-    if(me?.role!=='cashier')return;
-    const b=(window.cashierQueue||[]).find(x=>x.id===id);if(!b)return toast('Bill not found');
-    try{
-      const order=await rpc('cashier_bill_items',{p_session_id:id});
-      const rows=(order||[]).map((i,idx)=>`<tr><td>${idx+1}</td><td class="itemname">${safe(i.item_name)}</td><td class="num">${i.qty}</td><td class="num">${Number(i.unit_price).toFixed(2)}</td><td class="num">${(Number(i.unit_price)*Number(i.qty)).toFixed(2)}</td></tr>`).join('');
-      document.getElementById('modalbox').innerHTML=`<div class="bill-modal-head"><div><h2>${b.print_status==='pending'?'Print Bill':'Bill Reprint'}</h2><div class="note">${safe(b.order_no||'Bill')} · Table ${safe(tableLabel(b))} · ${safe(b.waiter_name||'Waiter')}</div></div><button class="btn ghost" onclick="closeModal()">Close</button></div><div class="receipt" id="receiptPrint"><div class="receipt-head"><img class="receipt-logo" src="https://wlediyikwdcmrkndgcfh.supabase.co/functions/v1/pos-logo"><div class="receipt-title">LOVE DOT POINT RESTAURANT</div><div class="receipt-sub">PURE VEG · A.C. RESTAURANT</div><div class="receipt-address">41, 42, 43, Madhav Mall, Opp. Ratanba School,<br>Thakkarbapa Nagar, Ahmedabad - 382350</div><div class="receipt-phone">M: 9898014793</div></div><div class="receipt-meta"><div><span>Table No.</span><b>${safe(tableLabel(b))}</b></div><div><span>Order No.</span><b>${safe(b.order_no||'-')}</b></div><div><span>Date</span><b>${b.finished_at?new Date(b.finished_at).toLocaleDateString('en-IN'):'-'}</b></div><div><span>Time</span><b>${b.finished_at?new Date(b.finished_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-'}</b></div></div><table class="bill-table"><thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>${rows}</tbody></table><div class="bill-summary"><div><span>GST</span><b>Not Applicable</b></div><div class="grand"><span>GRAND TOTAL</span><b>${money(b.total_amount)}</b></div><div><span>Payment Mode</span><b>${safe(b.payment_mode||'-')}</b></div></div><div class="receipt-footer">Thank You! Visit Again<br><small>Love Dot Point Restaurant · Pure Veg</small></div></div><div class="bill-actions"><button class="btn green" onclick="cashierPrintBill('${id}')">Print Bill</button>${b.print_status==='pending'?`<button class="btn ghost" onclick="cashierConfirmPrinted('${id}')">Mark Printed ✓</button>`:''}</div>`;
-      document.getElementById('modal').classList.remove('hidden');
-    }catch(e){toast(e.message)}
-  };
-
-  window.cashierPrintBill=function(id){
-    window.__cashierAfterPrintId=id;
-    try{window.print()}catch(e){toast(e.message)}
-  };
-
-  window.cashierConfirmPrinted=async function(id){
-    try{await rpc('cashier_mark_printed',{p_session_id:id});toast('Bill marked printed');closeModal();await renderCashierQueue()}catch(e){toast(e.message)}
-  };
-
-  window.cashierMarkPending=async function(id){
-    try{await rpc('cashier_mark_pending',{p_session_id:id});toast('Bill sent to print queue');await renderCashierQueue()}catch(e){toast(e.message)}
-  };
-
-  window.addEventListener('afterprint',async()=>{
-    const id=window.__cashierAfterPrintId;if(!id||me?.role!=='cashier')return;window.__cashierAfterPrintId=null;
-    try{await rpc('cashier_mark_printed',{p_session_id:id});toast('Bill printed ✓');closeModal();await renderCashierQueue()}catch(e){console.warn(e)}
-  });
-
-  function subscribeCashier(){
-    if(cashierChannel)sb.removeChannel(cashierChannel);
-    cashierChannel=sb.channel('cashier-print-queue').on('postgres_changes',{event:'UPDATE',schema:'public',table:'table_sessions'},payload=>{
-      if(me?.role!=='cashier')return;const n=payload.new||{};if(n.status==='finished')setTimeout(()=>view==='cashierreports'?renderCashierReports():renderCashierQueue(),180);
-    }).subscribe();
-  }
-
-  window.renderCashierSetup=async function(){
-    if(me?.role!=='owner')return;
-    const main=document.getElementById('main');main.innerHTML=head('Cashier / Billing Captain','Dedicated billing phone and print queue access.')+'<div class="card">Loading cashier...</div>';
-    try{
-      const j=await admin({action:'list_staff'});const c=(j.data||[]).find(x=>x.role==='cashier'&&!String(x.login_id||'').startsWith('removed_'));
-      window.currentCashier=c||null;
-      if(!c){main.innerHTML=head('Cashier / Billing Captain','Create one dedicated billing login.')+`<div class="card cashier-setup"><h3>Create Cashier Login</h3><div class="formrow"><input id="cashName" class="field" value="Kartik001" placeholder="Cashier Name"></div><div class="formrow"><input id="cashLogin" class="field" value="Kartik001" placeholder="Login ID"></div><div class="formrow"><input id="cashPw" class="field" type="password" placeholder="Password (6+)"></div><button class="btn" onclick="ownerActivateCashier()">Create Cashier</button></div>`;return}
-      main.innerHTML=head('Cashier / Billing Captain','Dedicated print operator account.')+`<div class="card cashier-setup"><div class="cashier-profile"><div><small>CASHIER</small><h3>${safe(c.name)}</h3><p>Login ID: <b>${safe(c.login_id)}</b></p></div><span class="staff-status ${c.active?'on':'off'}">${c.active?'Active':'Inactive'}</span></div>${c.auth_user_id?`<div class="cashier-actions"><button class="btn ghost" onclick="ownerResetCashierPassword('${c.id}')">Reset Password</button><button class="btn ${c.active?'red':'green'}" onclick="ownerSetCashierActive('${c.id}',${!c.active})">${c.active?'Deactivate':'Activate'}</button></div>`:`<div class="cashier-activate"><p>This cashier profile is ready. Set password once to activate login.</p><input id="cashPw" class="field" type="password" placeholder="Password (6+)"><button class="btn" onclick="ownerActivateCashier()">Activate Cashier Login</button></div>`}</div>`;
-    }catch(e){main.innerHTML=head('Cashier / Billing Captain','Unable to load')+`<div class="card">${safe(e.message)}</div>`}
-  };
-
-  window.ownerActivateCashier=async function(){
-    if(me?.role!=='owner')return;
-    const c=window.currentCashier;const name=(document.getElementById('cashName')?.value||c?.name||'Kartik001').trim();const login=(document.getElementById('cashLogin')?.value||c?.login_id||'Kartik001').trim();const password=document.getElementById('cashPw')?.value||'';
-    if(password.length<6)return toast('Password minimum 6 characters hona chahiye');
-    try{await admin({action:'add_cashier',name,login_id:login,password});toast('Cashier login activated');await renderCashierSetup()}catch(e){toast(e.message)}
-  };
-
-  window.ownerResetCashierPassword=async function(id){const password=prompt('New cashier password (6+ characters)');if(!password)return;try{await admin({action:'reset_cashier_password',staff_id:id,password});toast('Cashier password updated')}catch(e){toast(e.message)}};
-  window.ownerSetCashierActive=async function(id,active){try{await admin({action:'set_cashier_active',staff_id:id,active});toast(active?'Cashier activated':'Cashier deactivated');await renderCashierSetup()}catch(e){toast(e.message)}};
-
-  const note=document.querySelector('#loginView .note');if(note&&note.textContent.includes('Secure Owner & Waiter Login'))note.textContent='Secure Owner, Waiter & Cashier Login';
+'use strict';
+const baseBoot=window.boot,baseNavs=window.navs,baseRender=window.render,baseGo=window.go;
+let cashierChannel=null,lastPendingCount=0;
+const roleName=r=>r==='owner'?'Owner':r==='cashier'?'Billing Cashier':'Waiter';
+const safe=v=>typeof esc==='function'?esc(v):String(v??'').replace(/[&<>"']/g,'');
+const fmtDate=d=>{const x=new Date(d),o=x.getTimezoneOffset();return new Date(x.getTime()-o*60000).toISOString().slice(0,10)};
+const tableLabel=b=>{const a=Array.isArray(b?.joined_table_nos)?b.joined_table_nos.filter(Boolean):[];return a.length?a.join(' + '):(b?.table_no||'-')};
+const isToday=v=>!!v&&new Date(v).toDateString()===new Date().toDateString();
+async function rpc(name,args={}){const {data,error}=await sb.rpc(name,args);if(error)throw error;return data}
+async function admin(body){const {data,error}=await sb.functions.invoke('pos-admin',{body});if(error)throw error;if(data?.error)throw new Error(data.error);return data||{}}
+function setIdentity(){const el=document.getElementById('who');if(el&&me)el.textContent=`${me.name} · ${roleName(me.role)}`}
+window.boot=async function(){const {data:{user}}=await sb.auth.getUser();if(!user)return;const {data,error}=await sb.from('staff_profiles').select('*').eq('auth_user_id',user.id).single();if(error||!data){toast('Staff profile not linked');return}if(data.role!=='cashier'){await baseBoot();setIdentity();return}me=data;document.getElementById('loginView').classList.add('hidden');document.getElementById('appView').classList.remove('hidden');setIdentity();view='cashierqueue';selectedTable=null;selectedSession=null;items=[];renderNav();await renderCashierQueue();subscribeCashier()};
+window.navs=function(){if(me?.role==='cashier')return [['cashierqueue','Print Queue'],['cashierreports','Waiter Reports']];const list=baseNavs();if(me?.role==='owner'&&!list.some(x=>x[0]==='cashiersetup')){const copy=list.slice();let p=copy.findIndex(x=>x[0]==='history');if(p<0)p=copy.length;copy.splice(p,0,['cashiersetup','Cashier Reports']);return copy}return list};
+window.go=function(v){if(me?.role==='cashier'){if(!['cashierqueue','cashierreports'].includes(v))v='cashierqueue';view=v;renderNav();return v==='cashierreports'?renderCashierReports():renderCashierQueue()}if(me?.role==='owner'&&v==='cashiersetup'){view=v;renderNav();return renderCashierSetup()}return baseGo(v)};
+window.render=function(){if(me?.role==='cashier')return view==='cashierreports'?renderCashierReports():renderCashierQueue();if(me?.role==='owner'&&view==='cashiersetup')return renderCashierSetup();return baseRender()};
+async function loadQueue(){return await rpc('cashier_bill_queue',{p_limit:1000})||[]}
+async function loadActivity(limit=500){return await rpc('cashier_activity_report',{p_limit:limit})||[]}
+async function loadReport(from,to){return await rpc('cashier_report_bills',{p_from:from,p_to:to,p_limit:5000})||[]}
+function stats(list){const valid=list.filter(x=>!x.voided),today=valid.filter(x=>isToday(x.finished_at));return{pending:valid.filter(x=>x.print_status==='pending').length,bills:today.length,sales:today.reduce((a,b)=>a+Number(b.total_amount||0),0),cash:today.filter(x=>(x.payment_mode||'').toLowerCase()==='cash').reduce((a,b)=>a+Number(b.total_amount||0),0),upi:today.filter(x=>(x.payment_mode||'').toLowerCase()==='upi').reduce((a,b)=>a+Number(b.total_amount||0),0)}}
+function billCard(b,mode='queue'){const pending=b.print_status==='pending'&&!b.voided,status=b.voided?'VOID':pending?'PRINT PENDING':'PRINTED ✓',label=pending?'Open & Print':mode==='printed'?'View / Reprint':'View Bill';return `<article class="cashier-bill ${pending?'pending':'printed'} ${b.voided?'voided':''}"><div class="cashier-bill-main"><div><span class="cashier-status">${status}</span><b>${safe(b.order_no||'Bill')}</b><small>Table ${safe(tableLabel(b))} · Waiter: ${safe(b.waiter_name||'Unknown')}</small></div><strong>${money(b.total_amount)}</strong></div><div class="cashier-meta"><span>${b.finished_at?new Date(b.finished_at).toLocaleString('en-IN'):'-'}</span><span>${safe(b.payment_mode||'-')}</span>${b.print_count?`<span>Print count: ${b.print_count}</span>`:''}</div><div class="cashier-actions"><button class="btn ${pending?'green':'ghost'}" onclick="cashierOpenBill('${b.id}')">${label}</button>${!b.voided&&!pending?`<button class="btn ghost" onclick="cashierMarkPending('${b.id}')">Send to Print Queue</button>`:''}</div></article>`}
+window.renderCashierQueue=async function(){if(me?.role!=='cashier')return;const main=document.getElementById('main');main.innerHTML=head('Billing & Print Queue','Loading live completed bills...')+'<div class="card">Loading...</div>';try{const list=await loadQueue();window.cashierQueue=list;const st=stats(list),q=(window.cashierSearch||'').trim().toLowerCase(),match=x=>!q||(x.order_no||'').toLowerCase().includes(q)||String(tableLabel(x)).includes(q)||(x.waiter_name||'').toLowerCase().includes(q),pending=list.filter(x=>!x.voided&&x.print_status==='pending'&&match(x)),printed=list.filter(x=>!x.voided&&x.print_status!=='pending'&&match(x));if(st.pending>lastPendingCount){try{navigator.vibrate?.([150,80,150])}catch{};if(lastPendingCount||st.pending)toast('New bill ready to print')}lastPendingCount=st.pending;main.innerHTML=head('Billing & Print Queue','Pending bills stay on top. Printed bills move to a separate section after confirmation.')+`<section class="cashier-hero"><div><small>POSITION · BILLING CASHIER</small><h2>${safe(me.name)}</h2><p>Dedicated printer phone · Epson TM-T82X billing desk</p></div><button class="btn ghost" onclick="renderCashierQueue()">↻ Refresh</button></section><div class="cashier-kpis"><div class="attention"><span>Print Pending</span><b>${st.pending}</b></div><div><span>Today Bills</span><b>${st.bills}</b></div><div><span>Today Sales</span><b>${money(st.sales)}</b></div><div><span>Cash / UPI</span><b>${money(st.cash)} / ${money(st.upi)}</b></div></div>${st.pending?`<div class="cashier-alert">🧾 ${st.pending} bill${st.pending===1?'':'s'} waiting for print</div>`:'<div class="cashier-clear">✓ Print queue clear · koi bill pending nahi hai.</div>'}<div class="cashier-toolbar card"><input class="field" placeholder="Search bill no / table / waiter" value="${safe(window.cashierSearch||'')}" oninput="window.cashierSearch=this.value;renderCashierQueue()"></div><section class="cashier-section pending-section"><div class="history-section-title"><h3>🔔 Pending Print</h3><span>${pending.length} bills</span></div><div class="cashier-list">${pending.length?pending.map(x=>billCard(x,'pending')).join(''):'<div class="cashier-empty-success">All pending bills printed ✓</div>'}</div></section><section class="cashier-section printed-section"><div class="history-section-title"><h3>✓ Printed Bills</h3><span>${printed.length} records</span></div><div class="cashier-list">${printed.length?printed.slice(0,100).map(x=>billCard(x,'printed')).join(''):'<div class="card note">No printed bills yet.</div>'}</div></section>`}catch(e){main.innerHTML=head('Billing & Print Queue','Unable to load')+`<div class="card">${safe(e.message)}</div>`}};
+function reportBounds(){const d=new Date();return{from:window.cashierReportFrom||fmtDate(d),to:window.cashierReportTo||fmtDate(d)}}
+function waiterPerf(list){const p={};list.filter(x=>!x.voided).forEach(x=>{const n=x.waiter_name||'Unknown';if(!p[n])p[n]={bills:0,sales:0,cash:0,upi:0,pending:0};const z=p[n];z.bills++;z.sales+=Number(x.total_amount||0);if((x.payment_mode||'').toLowerCase()==='cash')z.cash+=Number(x.total_amount||0);if((x.payment_mode||'').toLowerCase()==='upi')z.upi+=Number(x.total_amount||0);if(x.print_status==='pending')z.pending++});return Object.entries(p).sort((a,b)=>b[1].sales-a[1].sales)}
+window.cashierSetQuickRange=function(days){const d=new Date(),f=new Date();f.setDate(d.getDate()-(days-1));window.cashierReportFrom=fmtDate(f);window.cashierReportTo=fmtDate(d);renderCashierReports()};
+window.cashierSetWaiter=function(v){window.cashierWaiterFilter=v;renderCashierReports()};
+window.renderCashierReports=async function(){if(me?.role!=='cashier')return;const main=document.getElementById('main'),{from,to}=reportBounds();main.innerHTML=head('Waiter Reports','Loading waiter-wise billing report...')+'<div class="card">Loading...</div>';try{const all=await loadReport(from,to);window.cashierQueue=[...(window.cashierQueue||[]),...all.filter(x=>!(window.cashierQueue||[]).some(y=>y.id===x.id))];const waiters=[...new Set(all.map(x=>x.waiter_name||'Unknown'))].sort(),wf=window.cashierWaiterFilter||'all',list=all.filter(x=>wf==='all'||(x.waiter_name||'Unknown')===wf),valid=list.filter(x=>!x.voided),total=valid.reduce((a,b)=>a+Number(b.total_amount||0),0),cash=valid.filter(x=>(x.payment_mode||'').toLowerCase()==='cash').reduce((a,b)=>a+Number(b.total_amount||0),0),upi=valid.filter(x=>(x.payment_mode||'').toLowerCase()==='upi').reduce((a,b)=>a+Number(b.total_amount||0),0),avg=valid.length?total/valid.length:0,ranking=waiterPerf(all),pending=valid.filter(x=>x.print_status==='pending').length;main.innerHTML=head('Waiter Reports','Date-wise waiter performance, collections and completed bill detail · read only.')+`<div class="cashier-report-filters card"><div><label>From</label><input class="field" type="date" value="${from}" onchange="window.cashierReportFrom=this.value;renderCashierReports()"></div><div><label>To</label><input class="field" type="date" value="${to}" onchange="window.cashierReportTo=this.value;renderCashierReports()"></div><div><label>Waiter</label><select class="field" onchange="cashierSetWaiter(this.value)"><option value="all">All Waiters</option>${waiters.map(w=>`<option ${wf===w?'selected':''} value="${safe(w)}">${safe(w)}</option>`).join('')}</select></div><div class="cashier-quick"><button class="btn ghost" onclick="cashierSetQuickRange(1)">Today</button><button class="btn ghost" onclick="cashierSetQuickRange(7)">7 Days</button><button class="btn ghost" onclick="cashierSetQuickRange(30)">30 Days</button></div></div><div class="cashier-kpis six"><div><span>Completed Bills</span><b>${valid.length}</b></div><div><span>Sales</span><b>${money(total)}</b></div><div><span>Average Bill</span><b>${money(avg)}</b></div><div><span>Cash</span><b>${money(cash)}</b></div><div><span>UPI</span><b>${money(upi)}</b></div><div class="attention"><span>Print Pending</span><b>${pending}</b></div></div><section class="card cashier-ranking"><div class="history-section-title"><h3>Waiter Performance</h3><span>${ranking.length} waiters</span></div>${ranking.length?ranking.map((r,i)=>`<div class="cashier-rank"><span>#${i+1}</span><div><b>${safe(r[0])}</b><small>${r[1].bills} bills · Cash ${money(r[1].cash)} · UPI ${money(r[1].upi)} · ${r[1].pending} print pending</small></div><strong>${money(r[1].sales)}</strong></div>`).join(''):'<div class="note">No waiter sales in selected period.</div>'}</section><section class="cashier-section"><div class="history-section-title"><h3>Bill Details</h3><span>${list.length} records</span></div><div class="cashier-list">${list.length?list.map(x=>billCard(x,x.print_status==='pending'?'pending':'printed')).join(''):'<div class="card note">No bills in selected period.</div>'}</div></section>`}catch(e){main.innerHTML=head('Waiter Reports','Unable to load')+`<div class="card">${safe(e.message)}</div>`}};
+window.cashierOpenBill=async function(id){if(me?.role!=='cashier')return;let b=(window.cashierQueue||[]).find(x=>x.id===id);if(!b){const q=await loadQueue();window.cashierQueue=q;b=q.find(x=>x.id===id)}if(!b)return toast('Bill not found');try{const order=await rpc('cashier_bill_items',{p_session_id:id}),rows=(order||[]).map((i,idx)=>`<tr><td>${idx+1}</td><td class="itemname">${safe(i.item_name)}</td><td class="num">${i.qty}</td><td class="num">${Number(i.unit_price).toFixed(2)}</td><td class="num">${(Number(i.unit_price)*Number(i.qty)).toFixed(2)}</td></tr>`).join(''),pending=b.print_status==='pending';document.getElementById('modalbox').innerHTML=`<div class="bill-modal-head"><div><h2>${pending?'Print Bill':'Printed Bill / Reprint'}</h2><div class="note">${safe(b.order_no||'Bill')} · Table ${safe(tableLabel(b))} · Waiter: ${safe(b.waiter_name||'Unknown')}</div></div><button class="btn ghost" onclick="closeModal()">Close</button></div><div class="receipt" id="receiptPrint"><div class="receipt-head"><img class="receipt-logo" src="https://wlediyikwdcmrkndgcfh.supabase.co/functions/v1/pos-logo"><div class="receipt-title">LOVE DOT POINT RESTAURANT</div><div class="receipt-sub">PURE VEG · A.C. RESTAURANT</div><div class="receipt-address">41, 42, 43, Madhav Mall, Opp. Ratanba School,<br>Thakkarbapa Nagar, Ahmedabad - 382350</div><div class="receipt-phone">M: 9898014793</div></div><div class="receipt-meta"><div><span>Table No.</span><b>${safe(tableLabel(b))}</b></div><div><span>Order No.</span><b>${safe(b.order_no||'-')}</b></div><div><span>Date</span><b>${b.finished_at?new Date(b.finished_at).toLocaleDateString('en-IN'):'-'}</b></div><div><span>Time</span><b>${b.finished_at?new Date(b.finished_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'-'}</b></div></div><table class="bill-table"><thead><tr><th>#</th><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>${rows}</tbody></table><div class="bill-summary"><div><span>GST</span><b>Not Applicable</b></div><div class="grand"><span>GRAND TOTAL</span><b>${money(b.total_amount)}</b></div><div><span>Payment Mode</span><b>${safe(b.payment_mode||'-')}</b></div></div><div class="receipt-footer">Thank You! Visit Again<br><small>Love Dot Point Restaurant · Pure Veg</small></div></div><div class="cashier-print-note">Physical receipt nikalne ke baad hi confirmation button dabayein.</div><div class="bill-actions"><button class="btn green" onclick="cashierPrintBill('${id}')">${pending?'Print Bill':'Print Again'}</button><button class="btn" onclick="cashierConfirmPrinted('${id}')">${pending?'Receipt Printed ✓':'Confirm Reprint ✓'}</button></div>`;document.getElementById('modal').classList.remove('hidden')}catch(e){toast(e.message)}};
+window.cashierPrintBill=function(id){window.__cashierPrintDialogId=id;try{window.print()}catch(e){toast(e.message)}};
+window.addEventListener('afterprint',()=>{if(me?.role==='cashier'&&window.__cashierPrintDialogId){toast('Receipt nikla ho to “Receipt Printed ✓” confirm karein.');window.__cashierPrintDialogId=null}});
+window.cashierConfirmPrinted=async function(id){try{await rpc('cashier_mark_printed',{p_session_id:id});toast('Printed confirmed ✓');closeModal();await renderCashierQueue()}catch(e){toast(e.message)}};
+window.cashierMarkPending=async function(id){try{await rpc('cashier_mark_pending',{p_session_id:id});toast('Bill moved to Pending Print');await renderCashierQueue()}catch(e){toast(e.message)}};
+function subscribeCashier(){if(cashierChannel)sb.removeChannel(cashierChannel);cashierChannel=sb.channel('cashier-print-queue-v2').on('postgres_changes',{event:'UPDATE',schema:'public',table:'table_sessions'},p=>{if(me?.role!=='cashier')return;const n=p.new||{};if(n.status==='finished')setTimeout(()=>view==='cashierreports'?renderCashierReports():renderCashierQueue(),180)}).subscribe()}
+window.renderCashierSetup=async function(){if(me?.role!=='owner')return;const main=document.getElementById('main');main.innerHTML=head('Cashier Reports & Control','Loading cashier position, print queue and activity...')+'<div class="card">Loading...</div>';try{const [staffResp,queue,activity]=await Promise.all([admin({action:'list_staff'}),loadQueue(),loadActivity(500)]),cashiers=(staffResp.data||[]).filter(x=>x.role==='cashier'&&!String(x.login_id||'').startsWith('removed_')),c=cashiers[0],todayAct=activity.filter(x=>isToday(x.printed_at)),first=todayAct.filter(x=>x.print_kind==='first_print'),reprints=todayAct.filter(x=>x.print_kind==='reprint'),pending=queue.filter(x=>!x.voided&&x.print_status==='pending'),handled=new Set(todayAct.map(x=>x.session_id)).size,last=activity[0];main.innerHTML=head('Cashier Reports & Control','Owner view · cashier printing activity, pending queue and accountability.')+`<section class="cashier-hero owner"><div><small>POSITION · BILLING CASHIER</small><h2>${safe(c?.name||'No Cashier')}</h2><p>${c?`Login: ${safe(c.login_id)} · ${c.active?'Active':'Inactive'}`:'Cashier profile not found'}</p></div><span class="cashier-owner-status ${c?.active?'on':'off'}">${c?.active?'ACTIVE':'INACTIVE'}</span></section><div class="cashier-kpis six"><div class="attention"><span>Pending Queue</span><b>${pending.length}</b></div><div><span>Bills Printed Today</span><b>${first.length}</b></div><div><span>Reprints Today</span><b>${reprints.length}</b></div><div><span>Unique Bills Handled</span><b>${handled}</b></div><div><span>Total Print Actions</span><b>${todayAct.length}</b></div><div><span>Last Print</span><b class="small-value">${last?new Date(last.printed_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}):'—'}</b></div></div><section class="card"><div class="history-section-title"><h3>Current Pending Print Queue</h3><span>${pending.length} bills</span></div>${pending.length?pending.slice(0,20).map(x=>`<div class="cashier-owner-row"><div><b>${safe(x.order_no||'Bill')}</b><small>Table ${safe(tableLabel(x))} · ${safe(x.waiter_name||'Unknown')}</small></div><strong>${money(x.total_amount)}</strong></div>`).join(''):'<div class="cashier-empty-success">Print queue clear ✓</div>'}</section><section class="card cashier-activity"><div class="history-section-title"><h3>Cashier Print Activity</h3><span>Latest ${Math.min(activity.length,100)}</span></div>${activity.length?activity.slice(0,100).map(a=>`<div class="cashier-owner-row"><div><b>${safe(a.order_no||'Bill')} · ${a.print_kind==='reprint'?'REPRINT':'PRINTED'}</b><small>Table ${safe(tableLabel(a))} · Waiter ${safe(a.waiter_name||'Unknown')} · By ${safe(a.cashier_name||'Owner')}</small></div><div class="owner-print-right"><strong>${money(a.total_amount)}</strong><small>${new Date(a.printed_at).toLocaleString('en-IN')}</small></div></div>`).join(''):'<div class="note">No print activity yet.</div>'}</section>`}catch(e){main.innerHTML=head('Cashier Reports & Control','Unable to load')+`<div class="card">${safe(e.message)}</div>`}};
 })();
