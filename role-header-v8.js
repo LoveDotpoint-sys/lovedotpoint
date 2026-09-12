@@ -6,7 +6,7 @@
 
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   function labelFor(role,view){
-    if(view==='cashierqueue'||view==='cashierreports'||role==='cashier')return 'BILLING CASHIER';
+    if(view==='cashierqueue'||view==='cashierreports'||role==='cashier')return 'CASHIER';
     if(role==='owner')return 'OWNER';
     return 'WAITER';
   }
@@ -40,17 +40,26 @@
     const who=document.getElementById('who');
     if(!who)return;
     const {role,name}=identity();
-    if(!name)return;
+    if(!role)return;
     const label=labelFor(role,window.view);
+    if(role==='cashier'||window.view==='cashierqueue'||window.view==='cashierreports'){
+      const html='<b class="top-role-name">CASHIER</b>';
+      if(who.innerHTML!==html)who.innerHTML=html;
+      who.dataset.roleLock='CASHIER';
+      who.setAttribute('aria-label','Cashier');
+      return;
+    }
+    if(!name)return;
     const html=`<span class="top-role-label">${esc(label)}</span><b class="top-role-name">${esc(name)}</b>`;
     if(who.innerHTML!==html)who.innerHTML=html;
     who.dataset.roleLock=label;
+    who.setAttribute('aria-label',`${label} ${name}`);
   }
 
   function guardView(){
     const {role}=identity();
     if(!role)return;
-    if((role==='cashier'||window.view==='cashierqueue'||window.view==='cashierreports')&&!['cashierqueue','cashierreports'].includes(window.view)){
+    if(role==='cashier'&&!['cashierqueue','cashierreports'].includes(window.view)){
       window.view='cashierqueue';
       if(typeof window.renderNav==='function')window.renderNav();
       if(typeof window.renderCashierQueue==='function')window.renderCashierQueue();
