@@ -4,7 +4,8 @@
   html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;width:80mm!important;min-width:80mm!important;height:auto!important;overflow:visible!important}
   body *{visibility:hidden!important}
   #receiptPrint,#receiptPrint *{visibility:visible!important}
-  #receiptPrint{position:absolute!important;left:0!important;top:0!important;width:80mm!important;max-width:80mm!important;margin:0!important;padding:2.5mm 2mm 4mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:0!important;border-radius:0!important;box-shadow:none!important;font-family:Arial,Helvetica,sans-serif!important;font-size:12px!important;line-height:1.32!important}
+  #receiptPrint{position:absolute!important;left:0!important;top:0!important;width:80mm!important;max-width:80mm!important;margin:0!important;padding:2.5mm 2mm 4mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:0!important;border-radius:0!important;box-shadow:none!important;font-family:Arial,Helvetica,sans-serif!important;font-size:12px!important;line-height:1.32!important;transform-origin:top left!important}
+  html.android-epson-print #receiptPrint{transform:scale(2.5)!important;width:80mm!important;max-width:80mm!important}
   #receiptPrint .receipt-logo{display:block!important;width:20mm!important;height:20mm!important;object-fit:contain!important;margin:0 auto 1mm!important;filter:grayscale(1) contrast(1.25)!important}
   #receiptPrint .receipt-head{text-align:center!important;border-bottom:1px dashed #000!important;padding-bottom:2mm!important;margin-bottom:2mm!important}
   #receiptPrint .receipt-title{font-size:17px!important;line-height:1.15!important;font-weight:900!important;letter-spacing:.1px!important}
