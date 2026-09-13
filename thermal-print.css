@@ -1,38 +1,35 @@
-/* Love Dot Point POS — Android Epson scale compensation
-   Epson TM Print Assistant is scaling a browser page to 80mm. We render a 210mm print canvas
-   so the final physical output fills the 80mm roll width instead of shrinking into the center.
-*/
-@page{size:210mm 400mm;margin:0}
+/* Love Dot Point POS — FINAL Epson TM Print Assistant 80mm compensation */
+@page{size:250mm 500mm;margin:0}
 @media print{
-  html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;width:210mm!important;max-width:210mm!important;height:auto!important;overflow:visible!important}
-  body *{visibility:hidden!important}
-  #receiptPrint,#receiptPrint *{visibility:visible!important}
-  #receiptPrint{position:absolute!important;left:0!important;top:0!important;width:210mm!important;max-width:210mm!important;min-width:210mm!important;margin:0!important;padding:5.25mm 6.5mm 7mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:0!important;border-radius:0!important;box-shadow:none!important;font-family:Arial,Helvetica,sans-serif!important;font-size:30px!important;line-height:1.24!important;transform:none!important;zoom:1!important;overflow:visible!important}
-  #receiptPrint .receipt-logo{display:block!important;width:47mm!important;height:47mm!important;object-fit:contain!important;margin:0 auto 2mm!important;filter:grayscale(1) contrast(1.25)!important}
-  #receiptPrint .receipt-head{text-align:center!important;border-bottom:2px dashed #000!important;padding-bottom:4mm!important;margin-bottom:4mm!important}
-  #receiptPrint .receipt-title{font-size:42px!important;line-height:1.1!important;font-weight:900!important}
-  #receiptPrint .receipt-sub{font-size:27px!important;font-weight:800!important;margin-top:1.3mm!important}
-  #receiptPrint .receipt-address,#receiptPrint .receipt-phone{font-size:25px!important;line-height:1.2!important;margin-top:1.3mm!important}
-  #receiptPrint .preview-tag{display:none!important}
-  #receiptPrint .receipt-meta{display:grid!important;grid-template-columns:1fr 1fr!important;gap:2mm 6mm!important;padding:0 0 4mm!important;margin-bottom:3mm!important;border-bottom:2px dashed #000!important}
-  #receiptPrint .receipt-meta>div{display:flex!important;justify-content:space-between!important;gap:4mm!important;font-size:26px!important}
-  #receiptPrint .receipt-meta span{white-space:nowrap!important}
-  #receiptPrint .receipt-meta b{text-align:right!important;overflow-wrap:anywhere!important}
-  #receiptPrint .bill-table{width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;font-size:26px!important}
-  #receiptPrint .bill-table th{font-weight:900!important;border-bottom:2px solid #000!important;padding:2.5mm 1mm!important;text-align:left!important}
-  #receiptPrint .bill-table td{padding:2.5mm 1mm!important;vertical-align:top!important;border:0!important;word-break:break-word!important}
-  #receiptPrint .bill-table tr{break-inside:avoid!important;page-break-inside:avoid!important}
-  #receiptPrint .bill-table th:nth-child(1),#receiptPrint .bill-table td:nth-child(1){width:13mm!important}
-  #receiptPrint .bill-table th:nth-child(2),#receiptPrint .bill-table td:nth-child(2){width:auto!important}
-  #receiptPrint .bill-table th:nth-child(3),#receiptPrint .bill-table td:nth-child(3){width:21mm!important}
-  #receiptPrint .bill-table th:nth-child(4),#receiptPrint .bill-table td:nth-child(4){width:34mm!important}
-  #receiptPrint .bill-table th:nth-child(5),#receiptPrint .bill-table td:nth-child(5){width:39mm!important}
-  #receiptPrint .num{text-align:right!important;white-space:nowrap!important}
-  #receiptPrint .itemname small{display:block!important;font-size:22px!important;font-weight:400!important;margin-top:.8mm!important;white-space:normal!important}
-  #receiptPrint .bill-summary{border-top:2px dashed #000!important;margin-top:3mm!important;padding-top:3mm!important;break-inside:avoid!important;page-break-inside:avoid!important}
-  #receiptPrint .bill-summary>div{display:flex!important;justify-content:space-between!important;gap:5mm!important;padding:1.4mm 0!important;font-size:27px!important}
-  #receiptPrint .bill-summary .grand{font-size:37px!important;font-weight:900!important;border-top:2px solid #000!important;border-bottom:2px solid #000!important;margin:2mm 0!important;padding:2.5mm 0!important}
-  #receiptPrint .receipt-footer{text-align:center!important;border-top:2px dashed #000!important;margin-top:4mm!important;padding-top:4mm!important;font-size:27px!important;font-weight:800!important;break-inside:avoid!important;page-break-inside:avoid!important}
-  #receiptPrint .receipt-footer small{font-size:22px!important;font-weight:400!important}
-  .modal,.modalbox,.bill-actions,.payment-box,.top,.side,.mobilebar{background:transparent!important;border:0!important;box-shadow:none!important}
+ html,body{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;width:250mm!important;max-width:250mm!important;height:auto!important;overflow:visible!important}
+ body *{visibility:hidden!important}
+ #receiptPrint,#receiptPrint *{visibility:visible!important}
+ #receiptPrint{position:absolute!important;left:0!important;top:0!important;width:250mm!important;min-width:250mm!important;max-width:250mm!important;margin:0!important;padding:5mm 5mm 7mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;border:0!important;border-radius:0!important;box-shadow:none!important;font-family:Arial,Helvetica,sans-serif!important;font-size:36px!important;line-height:1.24!important;transform:none!important;zoom:1!important;overflow:visible!important}
+ #receiptPrint .receipt-logo{display:block!important;width:48mm!important;height:48mm!important;object-fit:contain!important;margin:0 auto 2mm!important;filter:grayscale(1) contrast(1.35)!important}
+ #receiptPrint .receipt-head{text-align:center!important;border-bottom:2px dashed #000!important;padding-bottom:4mm!important;margin-bottom:4mm!important}
+ #receiptPrint .receipt-title{font-size:48px!important;line-height:1.08!important;font-weight:900!important}
+ #receiptPrint .receipt-sub{font-size:32px!important;font-weight:800!important;margin-top:1mm!important}
+ #receiptPrint .receipt-address,#receiptPrint .receipt-phone{font-size:29px!important;line-height:1.2!important;margin-top:1mm!important}
+ #receiptPrint .preview-tag{display:none!important}
+ #receiptPrint .receipt-meta{display:grid!important;grid-template-columns:1fr 1fr!important;gap:2mm 7mm!important;padding-bottom:4mm!important;margin-bottom:3mm!important;border-bottom:2px dashed #000!important}
+ #receiptPrint .receipt-meta>div{display:flex!important;justify-content:space-between!important;gap:4mm!important;font-size:31px!important}
+ #receiptPrint .receipt-meta span{white-space:nowrap!important}
+ #receiptPrint .receipt-meta b{text-align:right!important;overflow-wrap:anywhere!important}
+ #receiptPrint .bill-table{width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;font-size:31px!important}
+ #receiptPrint .bill-table th{font-size:29px!important;font-weight:900!important;border-bottom:2px solid #000!important;padding:2.5mm 1mm!important;text-align:left!important}
+ #receiptPrint .bill-table td{padding:2.7mm 1mm!important;vertical-align:top!important;border:0!important;word-break:break-word!important}
+ #receiptPrint .bill-table tr{break-inside:avoid!important;page-break-inside:avoid!important}
+ #receiptPrint .bill-table th:nth-child(1),#receiptPrint .bill-table td:nth-child(1){width:14mm!important}
+ #receiptPrint .bill-table th:nth-child(2),#receiptPrint .bill-table td:nth-child(2){width:auto!important}
+ #receiptPrint .bill-table th:nth-child(3),#receiptPrint .bill-table td:nth-child(3){width:24mm!important}
+ #receiptPrint .bill-table th:nth-child(4),#receiptPrint .bill-table td:nth-child(4){width:39mm!important}
+ #receiptPrint .bill-table th:nth-child(5),#receiptPrint .bill-table td:nth-child(5){width:45mm!important}
+ #receiptPrint .num{text-align:right!important;white-space:nowrap!important}
+ #receiptPrint .itemname small{display:block!important;font-size:25px!important;font-weight:400!important;margin-top:1mm!important;white-space:normal!important}
+ #receiptPrint .bill-summary{border-top:2px dashed #000!important;margin-top:3mm!important;padding-top:3mm!important;break-inside:avoid!important;page-break-inside:avoid!important}
+ #receiptPrint .bill-summary>div{display:flex!important;justify-content:space-between!important;gap:5mm!important;padding:1.5mm 0!important;font-size:32px!important}
+ #receiptPrint .bill-summary .grand{font-size:43px!important;font-weight:900!important;border-top:2px solid #000!important;border-bottom:2px solid #000!important;margin:2mm 0!important;padding:2.5mm 0!important}
+ #receiptPrint .receipt-footer{text-align:center!important;border-top:2px dashed #000!important;margin-top:4mm!important;padding-top:4mm!important;font-size:30px!important;font-weight:800!important;break-inside:avoid!important;page-break-inside:avoid!important}
+ #receiptPrint .receipt-footer small{font-size:25px!important;font-weight:400!important}
+ .modal,.modalbox,.bill-actions,.payment-box,.top,.side,.mobilebar{background:transparent!important;border:0!important;box-shadow:none!important}
 }
