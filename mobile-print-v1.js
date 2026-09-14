@@ -1,20 +1,18 @@
-/* Love Dot Point POS - Mobile Print V8
-   1024px portrait source canvas; dynamic height; one bill = one print page.
+/* Love Dot Point POS - Mobile Print V9
+   Epson TM-T82X: physical 80mm width; only page length changes with bill items.
 */
 (function(){
  'use strict';
- const CANVAS_PX=1024;
  function receiptReady(){return !!document.getElementById('receiptPrint')}
  if(!window.__nativePrint)window.__nativePrint=window.print.bind(window);
  function installPage(){
-  const r=document.getElementById('receiptPrint'); if(!r)return;
+  const r=document.getElementById('receiptPrint');if(!r)return;
   const rows=r.querySelectorAll('.bill-table tbody tr').length;
-  const measured=Math.ceil(r.scrollHeight)+80;
-  const estimated=720+(rows*72);
-  const height=Math.min(16000,Math.max(1000,measured,estimated));
+  /* Width must always remain physical 80mm. Height grows with the receipt. */
+  const heightMm=Math.min(1000,Math.max(115,82+(rows*6.8)));
   let s=document.getElementById('dynamicThermalPageSize');
   if(!s){s=document.createElement('style');s.id='dynamicThermalPageSize';document.head.appendChild(s)}
-  s.textContent='@media print{@page{size:'+CANVAS_PX+'px '+height+'px;margin:0!important}html,body{width:'+CANVAS_PX+'px!important;min-width:'+CANVAS_PX+'px!important;max-width:'+CANVAS_PX+'px!important;height:'+height+'px!important;min-height:'+height+'px!important;margin:0!important;padding:0!important;overflow:visible!important}#receiptPrint{width:'+CANVAS_PX+'px!important;min-width:'+CANVAS_PX+'px!important;max-width:'+CANVAS_PX+'px!important;transform:none!important;zoom:1!important}}';
+  s.textContent='@media print{@page{size:80mm '+heightMm+'mm;margin:0!important}html,body{width:80mm!important;min-width:80mm!important;max-width:80mm!important;height:'+heightMm+'mm!important;min-height:'+heightMm+'mm!important;margin:0!important;padding:0!important;overflow:visible!important}#receiptPrint{width:80mm!important;min-width:80mm!important;max-width:80mm!important;transform:none!important;zoom:1!important}}';
  }
  function prepare(){document.documentElement.classList.add('receipt-printing');if(/Android/i.test(navigator.userAgent||''))document.documentElement.classList.add('android-epson-print');installPage()}
  function cleanup(){document.documentElement.classList.remove('receipt-printing','android-epson-print')}
