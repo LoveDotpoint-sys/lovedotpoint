@@ -1,15 +1,20 @@
-/* Love Dot Point POS - Epson/Android print bridge
-   Physical paper width/length is controlled by Epson TM Print Assistant.
-   Never inject a fixed/dynamic @page height: Android may fit that virtual page and shrink
-   an 80mm receipt, or paginate it into a blank second page. */
+/* Love Dot Point POS - Epson/Android 1024px print bridge
+   Epson preview uses a 1024px document canvas. Keep width fixed at 1024px and set the
+   print page height from the fully rendered receipt so one bill is one content-sized page. */
 (function(){
  'use strict';
  function receiptReady(){return !!document.getElementById('receiptPrint')}
  if(!window.__nativePrint)window.__nativePrint=window.print.bind(window);
  function removeLegacyPageSizing(){
-  const old=document.getElementById('dynamicThermalPageSize');
-  if(old)old.remove();
+  const old=document.getElementById('dynamicThermalPageSize');if(old)old.remove();
   document.querySelectorAll('style[data-thermal-page]').forEach(function(x){x.remove()});
+ }
+ function installMeasuredPage(){
+  const r=document.getElementById('receiptPrint');if(!r)return;
+  let s=document.getElementById('epsonMeasuredPage');
+  if(!s){s=document.createElement('style');s.id='epsonMeasuredPage';document.head.appendChild(s)}
+  const h=Math.ceil(Math.max(r.scrollHeight,r.getBoundingClientRect().height)+8);
+  s.textContent='@media print{@page{size:1024px '+h+'px;margin:0!important}html,body{width:1024px!important;min-width:1024px!important;max-width:1024px!important;height:'+h+'px!important;min-height:'+h+'px!important;max-height:'+h+'px!important;margin:0!important;padding:0!important;overflow:hidden!important}#receiptPrint{left:0!important;top:0!important;width:1024px!important;min-width:1024px!important;max-width:1024px!important;height:auto!important;transform:none!important;zoom:1!important}}';
  }
  function prepare(){
   removeLegacyPageSizing();
@@ -26,7 +31,7 @@
  window.continueReceiptPrint=function(){
   if(!receiptReady()){if(typeof toast==='function')toast('Final bill receipt abhi available nahi hai.');return}
   prepare();
-  setTimeout(function(){try{window.__nativePrint.call(window)}finally{setTimeout(cleanup,2200)}},180);
+  requestAnimationFrame(function(){requestAnimationFrame(function(){installMeasuredPage();setTimeout(function(){try{window.__nativePrint.call(window)}finally{setTimeout(cleanup,2200)}},100)})});
  };
  window.print=function(){if(!receiptReady()){if(typeof toast==='function')toast('Pehle payment complete karke final bill banayein.');return}return window.continueReceiptPrint()};
  window.mobilePrintInfo={receiptReady:receiptReady};
